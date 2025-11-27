@@ -1,0 +1,45 @@
+# 3_moe_ray_job.yaml
+apiVersion: ray.io/v1
+kind: RayJob
+metadata:
+  name: moe-rlhf-job-001
+  namespace: team-a-ns
+  labels:
+    kueue.x-k8s.io/queue-name: team-a-queue # [중요] 이 작업을 Kueue에게 맡김
+spec:
+  # RayJob이 끝나면 클러스터를 자동 삭제 (비용 절감)
+  shutdownAfterJobFinishes: true
+  
+  entrypoint: "python moe_train.py" # 컨테이너 내부 실행 명령어
+  
+  rayClusterSpec:
+    rayVersion: '2.9.0'
+    headGroupSpec:
+      rayStartParams:
+        dashboard-host: '0.0.0.0'
+      template:
+        spec:
+          containers:
+          - name: ray-head
+            image: my-registry/moe-trainer:v1
+            resources:
+              requests:
+                cpu: "2"
+                memory: "8Gi"
+                
+    workerGroupSpecs:
+    - replicas: 4 # [중요] GPU 워커 4개가 동시에 필요함
+      minReplicas: 4
+      maxReplicas: 4
+      groupName: gpu-group
+      rayStartParams: {}
+      template:
+        spec:
+          containers:
+          - name: ray-worker
+            image: my-registry/moe-trainer:v1
+            resources:
+              requests:
+                cpu: "4"
+                memory: "16Gi"
+                nvidia.com/gpu: "1" # 각 워커당 GPU 1개 요청
