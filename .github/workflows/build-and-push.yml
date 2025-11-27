@@ -1,0 +1,64 @@
+name: Build and Push Docker Image
+
+on:
+  push:
+    branches: [ "main" ]        # main 브랜치에 푸시될 때 실행
+    # tags: [ 'v*.*.*' ]        # (옵션) v1.0.0 같은 태그가 달릴 때 실행
+  pull_request:
+    branches: [ "main" ]        # PR 단계에서 빌드 테스트 용도 (푸시는 안 함)
+
+env:
+  # 이미지 이름 설정 (ghcr.io/깃허브유저명/레포명)
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push-image:
+    runs-on: ubuntu-latest
+    # GitHub Token을 사용하여 패키지를 읽고 쓸 수 있는 권한 부여
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Docker Buildx 설정 (캐싱 및 멀티 플랫폼 빌드 지원)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # GitHub Container Registry 로그인
+      # (PR이 아닐 때만 로그인 수행)
+      - name: Log in to the Container registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          # GITHUB_TOKEN은 별도 설정 없이 GitHub이 자동으로 제공하는 시크릿입니다.
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 메타데이터 추출 (태그, 라벨 등 자동 생성)
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=sha,format=long
+            # main 브랜치일 경우 'latest' 태그 추가
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      # 빌드 및 푸시 수행
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }} # PR이 아니면 푸시
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha # GitHub Actions 캐시 사용
+          cache-to: type=gha,mode=max
