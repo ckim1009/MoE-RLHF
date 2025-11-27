@@ -1,0 +1,19 @@
+# 1_cluster_queue.yaml
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ClusterQueue
+metadata:
+  name: gpu-cluster-pool
+spec:
+  namespaceSelector: {} # 모든 네임스페이스 관리
+  resourceGroups:
+  - coveredResources: ["nvidia.com/gpu"] # 관리할 자원: GPU
+    flavors:
+    - name: "nvidia-a100" # A100 GPU 노드 그룹
+      resources:
+      - name: "nvidia.com/gpu"
+        nominalQuota: 8 # 총 가용 GPU 개수 (예: 8장)
+  
+  # [핵심] 큐 정책
+  preemption:
+    reclaimWithinCohort: Any # 급한 작업이 들어오면 우선순위 낮은 작업 중단 가능
+    withinClusterQueue: LowerPriority
