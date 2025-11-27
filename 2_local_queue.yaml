@@ -1,0 +1,8 @@
+# 2_local_queue.yaml
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: LocalQueue
+metadata:
+  name: team-a-queue # A팀 전용 큐
+  namespace: team-a-ns
+spec:
+  clusterQueue: gpu-cluster-pool # 위의 ClusterQueue와 연결
